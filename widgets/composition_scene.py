@@ -463,7 +463,7 @@ class CompositionView(QGraphicsView):
             self.focus_on(list(ids), edge_id)
 
     def resolve_node_id(self, ref: str) -> str | None:
-        """Map a model path to a graph node id (handles outer:: / runnable:: / peer)."""
+        """Map a model path to a graph node id (handles outer:: / runnable:: / peer / L::)."""
         if not ref:
             return None
         if ref in self._node_items:
@@ -474,10 +474,31 @@ class CompositionView(QGraphicsView):
             "peer::",
             "peerstar-focus::",
             "peerstar-peer::",
+            "L::focus::",
         ):
             cand = f"{prefix}{ref}"
             if cand in self._node_items:
                 return cand
+        # Peer-star / remapped chain nodes use L:: / R0:: ids; match meta.port_path
+        g = self._graph
+        if g:
+            prefer_l = None
+            any_hit = None
+            for n in g.nodes:
+                meta = n.meta or {}
+                if meta.get("port_path") != ref:
+                    continue
+                if n.id not in self._node_items:
+                    continue
+                if n.id.startswith("L::"):
+                    prefer_l = n.id
+                    break
+                if any_hit is None:
+                    any_hit = n.id
+            if prefer_l:
+                return prefer_l
+            if any_hit:
+                return any_hit
         return None
 
     def focus_on(self, node_ids: list[str] | None = None, edge_id: str | None = None):
