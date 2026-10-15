@@ -399,6 +399,12 @@ def run_consistency_checks(
     # P without R / R without P (name heuristic + optional peer file)
     issues.extend(_check_direction_orphans(model, peer_model))
 
+    # File-level export defects (ADT/IDT/UUID fixable via tool_gui scripts;
+    # empty CS / N:M reported with backdoor only)
+    from .export_defect_checks import run_export_defect_checks
+
+    issues.extend(run_export_defect_checks(model.filepath or ""))
+
     return issues
 
 
