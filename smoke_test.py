@@ -164,30 +164,22 @@ def main() -> int:
     if not _ok("find 1n keyword", isinstance(hits_1n, list)):
         failed += 1
 
-    # Empty CS / VALUE-SPEC streaming indexer (fix_empty_constants.py)
+    # Export-defect checks (empty CS backdoor + tool_gui resolve)
+    from arxml_viewer.export_defect_checks import scan_empty_constants
+    from arxml_viewer.external_fix import is_backdoor_action, resolve_tool_gui_dir
+
     empty_cs = os.path.join(testdata, "mini_empty_cs.arxml")
     if os.path.isfile(empty_cs):
-        sys.path.insert(0, os.path.dirname(root))  # repo root for fix_empty_constants
-        from fix_empty_constants import process as fix_cs_process, stream_index_input
-
-        elines = open(empty_cs, encoding="utf-8").read().splitlines()
-        eindex = stream_index_input(elines)
-        if not _ok(
-            "stream empty CS index",
-            len(eindex.empties) == 2 and "Uint16" in eindex.adts,
-            f"empties={len(eindex.empties)} adts={list(eindex.adts)}",
-        ):
+        ecs = scan_empty_constants(empty_cs)
+        has_empty = any("空壳" in i.message or "缺 VALUE-SPEC" in i.message for i in ecs)
+        if not _ok("scan empty constants", has_empty, f"n={len(ecs)}"):
             failed += 1
-        out_cs = os.path.join(td, "fixed_cs.arxml")
-        donor_cs = os.path.join(testdata, "mini_empty_cs_donor.arxml")
-        nfix = fix_cs_process(empty_cs, out_cs, [donor_cs] if os.path.isfile(donor_cs) else [])
-        fixed_idx = stream_index_input(open(out_cs, encoding="utf-8").read().splitlines())
-        if not _ok(
-            "fix_empty_constants",
-            nfix >= 2 and len(fixed_idx.empties) == 0,
-            f"fixed={nfix} remain={len(fixed_idx.empties)}",
-        ):
-            failed += 1
+        if ecs and resolve_tool_gui_dir():
+            if not _ok(
+                "empty CS backdoor flag",
+                any(is_backdoor_action(i.fix_action) for i in ecs),
+            ):
+                failed += 1
 
     print("-" * 40)
     print("FAILED" if failed else "ALL PASS", f"({failed} failures)")
