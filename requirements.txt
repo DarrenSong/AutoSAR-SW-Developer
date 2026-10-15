@@ -1,0 +1,6 @@
+PySide6>=6.5.0
+lxml>=4.9.0
+
+# Optional: PDF validation reports (File → Validate → 保存结果)
+#   pip install reportlab
+# Or: pip install -r requirements-pdf.txt
