@@ -989,15 +989,18 @@ class MainWindow(QMainWindow):
                 self._peer_star_expand = {0}  # default expand first peer chain
             lifted = self._model.lift_port_for_peer_view(seed)
             self._peer_star_port = seed
+            self._trace_port = seed
+            self._last_sel_path = seed
+            self._last_sel_kind = "port"
             self._view_mode = "peers"
             self._reload_graph()
             self._update_breadcrumb()
             self._sync_view_buttons()
+            # Count peers without binding to an unrelated prior chain
             n = sum(
                 1
                 for p in self._model.find_port_peers(
                     lifted,
-                    chain=self._current_chain(),
                     peer_model=self._peer_model,
                 )
                 if p.relation in ("assembly", "direction_pair", "cross_file")
@@ -1197,6 +1200,12 @@ class MainWindow(QMainWindow):
             )
             if nid:
                 self.graph.highlight_connection(None, [nid], focus=True)
+            else:
+                # Still fit whole peer-star scene when path→node map misses
+                self.graph.fitInView(
+                    self.graph.scene().sceneRect(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                )
             self._mirror_sync_graph_window(g, [nid] if nid else focus)
             return
 
@@ -2865,6 +2874,7 @@ class MainWindow(QMainWindow):
         dlg.jump_to.connect(self._jump_to)
         dlg.about_to_fix.connect(self._on_about_to_consistency_fix)
         dlg.fixes_applied.connect(self._on_fixes_applied)
+        dlg.open_fixed_file.connect(self._open_path_after_script_fix)
         dlg.exec()
 
     def _load_os_rte_for_model(self, model: ArxmlModel):
@@ -3206,6 +3216,7 @@ class MainWindow(QMainWindow):
             dlg = SpecValidateDialog(result, self, model=self._model)
             dlg.jump_to.connect(self._jump_to)
             dlg.jump_source.connect(self._jump_to_source_line)
+            dlg.open_fixed_file.connect(self._open_path_after_script_fix)
             dlg.exec()
 
     def undo_last_edit(self):
@@ -3288,6 +3299,22 @@ class MainWindow(QMainWindow):
         self._reload_graph()
         self._update_title()
         self.status.showMessage(f"已应用 {n} 处修复（需 Save / Save peer 写回）")
+
+    def _open_path_after_script_fix(self, path: str):
+        """Reload viewer on beta file written by tool_gui script from CheckDialog."""
+        if not path or not os.path.isfile(path):
+            QMessageBox.warning(self, "打开修复结果", f"文件不存在:\n{path}")
+            return
+        if self._model and self._model.is_dirty():
+            ans = QMessageBox.question(
+                self,
+                "打开修复结果",
+                "当前文件有未保存修改，打开脚本输出将丢弃 pending。继续？",
+            )
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+        self.load_file(path)
+        self.status.showMessage(f"已打开脚本修复结果: {path}")
 
     def _jump_to(self, path: str, kind: str):
         if not path or not self._model:
