@@ -1,0 +1,3 @@
+# Optional extras for PDF validation reports
+-r requirements.txt
+reportlab>=4.0.0
